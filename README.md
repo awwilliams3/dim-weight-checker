@@ -1,0 +1,68 @@
+# dim-weight-checker
+
+Carriers don't charge shipping based on actual weight alone. They charge
+based on the greater of actual weight and *dimensional weight* (a
+volumetric estimate: length x width x height, divided by a carrier-set
+divisor). A big, light box can cost as much to ship as a small, heavy one.
+
+This tool answers one question: for a batch of packages, what is the
+billable weight, and did dimensional weight kick in?
+
+## Input format
+
+CSV rows of `id,length,width,height,weight`. A header row is fine, it's
+detected automatically and skipped. Units are inches and pounds by
+default, or centimeters and kilograms with `-unit cm`.
+
+```
+id,length,width,height,weight
+box-1,12,10,8,4
+box-2,24,18,18,6
+envelope,15,12,1,0.5
+```
+
+## Usage
+
+From a file:
+
+```
+dim-weight-checker packages.csv
+```
+
+From stdin:
+
+```
+cat packages.csv | dim-weight-checker
+```
+
+Multiple sources, mixing files and stdin (`-` means stdin):
+
+```
+dim-weight-checker warehouse-a.csv - warehouse-b.csv < warehouse-c-stream.csv
+```
+
+Output is CSV on stdout:
+
+```
+id,length,width,height,actual_weight,dim_weight,billable_weight,dim_applies
+box-1,12,10,8,4,7,7,true
+box-2,24,18,18,6,57,57,true
+envelope,15,12,1,0.5,1,1,true
+```
+
+## Flags
+
+- `-unit in|cm` — measurement system, default `in` (inches/pounds).
+  `cm` means centimeters/kilograms.
+- `-divisor N` — override the dim weight divisor. Defaults to 139
+  (standard US domestic imperial figure) or 5000 (standard metric
+  figure) depending on `-unit`. Set this if your carrier contract uses
+  a different number, which does happen for international or freight
+  rates.
+
+## Why the defaults are what they are
+
+139 and 5000 are the numbers UPS, FedEx, and USPS Priority Mail publish
+for their standard domestic dimensional weight formula. They are common
+enough to be a reasonable default, not universal. Always check your own
+carrier's rate sheet before relying on this for a real invoice dispute.
