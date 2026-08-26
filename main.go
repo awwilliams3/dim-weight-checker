@@ -72,14 +72,7 @@ func main() {
 			continue
 		}
 		for _, r := range recs {
-			dimWeight := math.Ceil((r.length * r.width * r.height) / d)
-			actual := math.Ceil(r.actualWeight)
-			billable := actual
-			applies := false
-			if dimWeight > actual {
-				billable = dimWeight
-				applies = true
-			}
+			dimWeight, actual, billable, applies := billableWeight(r, d)
 			w.Write([]string{
 				r.id,
 				strconv.FormatFloat(r.length, 'f', -1, 64),
@@ -93,6 +86,21 @@ func main() {
 		}
 	}
 	os.Exit(exitCode)
+}
+
+// billableWeight applies the carrier rounding rule: length, width, and
+// height multiply out to cubic units, divide by the divisor to get dim
+// weight, and both dim weight and actual weight round up independently
+// before being compared, since that's how carriers bill fractional pounds.
+func billableWeight(r record, divisor float64) (dimWeight, actual, billable float64, applies bool) {
+	dimWeight = math.Ceil((r.length * r.width * r.height) / divisor)
+	actual = math.Ceil(r.actualWeight)
+	billable = actual
+	if dimWeight > actual {
+		billable = dimWeight
+		applies = true
+	}
+	return dimWeight, actual, billable, applies
 }
 
 // sourceSet bundles the readers a run should consume, plus any files that
