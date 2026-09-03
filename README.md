@@ -21,6 +21,16 @@ box-2,24,18,18,6
 envelope,15,12,1,0.5
 ```
 
+With `-json`, input is a JSON array of objects with the same fields
+instead:
+
+```
+[
+  {"id": "box-1", "length": 12, "width": 10, "height": 8, "weight": 4},
+  {"id": "box-2", "length": 24, "width": 18, "height": 18, "weight": 6}
+]
+```
+
 ## Usage
 
 From a file:
@@ -59,6 +69,9 @@ envelope,15,12,1,0.5,1,1,true
   figure) depending on `-unit`. Set this if your carrier contract uses
   a different number, which does happen for international or freight
   rates.
+- `-json` — parse input as a JSON array of objects instead of CSV.
+  Applies to all sources for the run; you can't mix CSV and JSON files
+  in one invocation.
 
 ## Why the defaults are what they are
 

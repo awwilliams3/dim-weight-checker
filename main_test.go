@@ -64,6 +64,44 @@ func TestReadRecordsTrimsWhitespace(t *testing.T) {
 	}
 }
 
+func TestReadJSONRecords(t *testing.T) {
+	input := `[
+		{"id": "box-1", "length": 12, "width": 10, "height": 8, "weight": 4},
+		{"id": "box-2", "length": 24, "width": 18, "height": 18, "weight": 6}
+	]`
+	recs, err := readJSONRecords(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("readJSONRecords: %v", err)
+	}
+	if len(recs) != 2 {
+		t.Fatalf("got %d records, want 2", len(recs))
+	}
+	want := record{id: "box-1", length: 12, width: 10, height: 8, actualWeight: 4}
+	if recs[0] != want {
+		t.Errorf("got %+v, want %+v", recs[0], want)
+	}
+	if recs[1].id != "box-2" {
+		t.Errorf("got id %q, want box-2", recs[1].id)
+	}
+}
+
+func TestReadJSONRecordsEmptyArray(t *testing.T) {
+	recs, err := readJSONRecords(strings.NewReader(`[]`))
+	if err != nil {
+		t.Fatalf("readJSONRecords: %v", err)
+	}
+	if len(recs) != 0 {
+		t.Fatalf("got %d records, want 0", len(recs))
+	}
+}
+
+func TestReadJSONRecordsInvalidJSON(t *testing.T) {
+	_, err := readJSONRecords(strings.NewReader(`not json`))
+	if err == nil {
+		t.Fatal("expected an error for invalid JSON, got nil")
+	}
+}
+
 func TestBillableWeightDimExceedsActual(t *testing.T) {
 	r := record{length: 24, width: 18, height: 18, actualWeight: 6}
 	dimWeight, actual, billable, applies := billableWeight(r, imperialDivisor)

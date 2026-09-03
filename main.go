@@ -5,6 +5,7 @@ package main
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -34,10 +35,12 @@ type record struct {
 func main() {
 	unit := flag.String("unit", "in", "measurement system: in (inches/lb) or cm (centimeters/kg)")
 	divisor := flag.Float64("divisor", 0, "dim weight divisor, overrides the default for the chosen unit")
+	jsonInput := flag.Bool("json", false, "parse input as a JSON array of objects instead of CSV")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: %s [-unit in|cm] [-divisor N] [file ...]\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Reads shipping package rows (id,length,width,height,weight) as CSV\n")
-		fmt.Fprintf(os.Stderr, "and prints the billable weight a carrier would charge for each one.\n")
+		fmt.Fprintf(os.Stderr, "usage: %s [-unit in|cm] [-divisor N] [-json] [file ...]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Reads shipping package rows (id,length,width,height,weight) as CSV,\n")
+		fmt.Fprintf(os.Stderr, "or as JSON objects with -json, and prints the billable weight a\n")
+		fmt.Fprintf(os.Stderr, "carrier would charge for each one.\n")
 		fmt.Fprintf(os.Stderr, "With no files given, reads from stdin. Use \"-\" for stdin among files.\n\n")
 		flag.PrintDefaults()
 	}
@@ -65,7 +68,13 @@ func main() {
 
 	exitCode := 0
 	for _, src := range sources.readers {
-		recs, err := readRecords(src)
+		var recs []record
+		var err error
+		if *jsonInput {
+			recs, err = readJSONRecords(src)
+		} else {
+			recs, err = readRecords(src)
+		}
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			exitCode = 1
@@ -175,6 +184,40 @@ func readRecords(r io.Reader) ([]record, error) {
 			height:       height,
 			actualWeight: weight,
 		})
+	}
+	return recs, nil
+}
+
+// jsonRecord mirrors the CSV columns for JSON input. Field names are
+// lowercase to match the CSV header rather than following Go's usual
+// exported-field casing, since this is what a user's JSON is expected
+// to look like.
+type jsonRecord struct {
+	ID     string  `json:"id"`
+	Length float64 `json:"length"`
+	Width  float64 `json:"width"`
+	Height float64 `json:"height"`
+	Weight float64 `json:"weight"`
+}
+
+// readJSONRecords parses a JSON array of package objects. Unlike CSV
+// there's no header-row ambiguity to resolve, so a malformed object
+// fails the whole batch rather than being skipped.
+func readJSONRecords(r io.Reader) ([]record, error) {
+	var in []jsonRecord
+	if err := json.NewDecoder(r).Decode(&in); err != nil {
+		return nil, err
+	}
+
+	recs := make([]record, len(in))
+	for i, jr := range in {
+		recs[i] = record{
+			id:           jr.ID,
+			length:       jr.Length,
+			width:        jr.Width,
+			height:       jr.Height,
+			actualWeight: jr.Weight,
+		}
 	}
 	return recs, nil
 }
