@@ -15,14 +15,28 @@ import (
 	"strings"
 )
 
-// Divisors are the standard US domestic figures used by UPS, FedEx, and
-// USPS Priority Mail: cubic inches per pound for imperial, cubic
-// centimeters per kilogram for metric. Individual carrier contracts do
-// vary, which is why -divisor exists to override these.
+// Default divisors, used when no -carrier is given: cubic inches per pound
+// for imperial, cubic centimeters per kilogram for metric. These match
+// UPS and FedEx's published domestic figures. Individual carrier contracts
+// do vary, which is why -divisor and -carrier both exist to override them.
 const (
 	imperialDivisor = 139.0
 	metricDivisor   = 5000.0
 )
+
+// carrierDivisors holds published dim weight divisors per carrier, for
+// carriers whose figures differ from the plain -unit default above. USPS
+// has historically used 166 for Priority Mail and Retail Ground rather
+// than 139, which works out in the shipper's favor (a higher divisor means
+// a lower dim weight for the same box).
+var carrierDivisors = map[string]struct {
+	imperial float64
+	metric   float64
+}{
+	"ups":   {imperialDivisor, metricDivisor},
+	"fedex": {imperialDivisor, metricDivisor},
+	"usps":  {166.0, metricDivisor},
+}
 
 type record struct {
 	id           string
@@ -34,10 +48,11 @@ type record struct {
 
 func main() {
 	unit := flag.String("unit", "in", "measurement system: in (inches/lb) or cm (centimeters/kg)")
-	divisor := flag.Float64("divisor", 0, "dim weight divisor, overrides the default for the chosen unit")
+	carrier := flag.String("carrier", "", "known carrier to use published divisors for: ups, fedex, usps (overrides the -unit default, overridden by -divisor)")
+	divisor := flag.Float64("divisor", 0, "dim weight divisor, overrides the default for the chosen unit and any -carrier")
 	jsonInput := flag.Bool("json", false, "parse input as a JSON array of objects instead of CSV")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: %s [-unit in|cm] [-divisor N] [-json] [file ...]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "usage: %s [-unit in|cm] [-carrier ups|fedex|usps] [-divisor N] [-json] [file ...]\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Reads shipping package rows (id,length,width,height,weight) as CSV,\n")
 		fmt.Fprintf(os.Stderr, "or as JSON objects with -json, and prints the billable weight a\n")
 		fmt.Fprintf(os.Stderr, "carrier would charge for each one.\n")
@@ -46,13 +61,10 @@ func main() {
 	}
 	flag.Parse()
 
-	d := *divisor
-	if d == 0 {
-		if *unit == "cm" {
-			d = metricDivisor
-		} else {
-			d = imperialDivisor
-		}
+	d, err := divisorFor(*carrier, *unit, *divisor)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
 	}
 
 	sources, err := openSources(flag.Args())
@@ -95,6 +107,31 @@ func main() {
 		}
 	}
 	os.Exit(exitCode)
+}
+
+// divisorFor resolves the dim weight divisor to use, in priority order:
+// an explicit -divisor override, then a known carrier's published figure,
+// then the plain -unit default. An unrecognized carrier name is an error
+// rather than a silent fallback, since guessing wrong here misreports what
+// a shipper will actually be billed.
+func divisorFor(carrierName, unit string, override float64) (float64, error) {
+	if override != 0 {
+		return override, nil
+	}
+	if carrierName != "" {
+		spec, ok := carrierDivisors[strings.ToLower(carrierName)]
+		if !ok {
+			return 0, fmt.Errorf("unknown carrier %q, want one of: ups, fedex, usps", carrierName)
+		}
+		if unit == "cm" {
+			return spec.metric, nil
+		}
+		return spec.imperial, nil
+	}
+	if unit == "cm" {
+		return metricDivisor, nil
+	}
+	return imperialDivisor, nil
 }
 
 // billableWeight applies the carrier rounding rule: length, width, and

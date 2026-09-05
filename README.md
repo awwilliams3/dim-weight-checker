@@ -64,11 +64,15 @@ envelope,15,12,1,0.5,1,1,true
 
 - `-unit in|cm` — measurement system, default `in` (inches/pounds).
   `cm` means centimeters/kilograms.
-- `-divisor N` — override the dim weight divisor. Defaults to 139
-  (standard US domestic imperial figure) or 5000 (standard metric
-  figure) depending on `-unit`. Set this if your carrier contract uses
-  a different number, which does happen for international or freight
-  rates.
+- `-carrier ups|fedex|usps` — use that carrier's published divisor
+  instead of the plain `-unit` default. UPS and FedEx both use 139
+  (imperial) / 5000 (metric); USPS uses 166 (imperial) / 5000 (metric)
+  for Priority Mail and Retail Ground. Unknown carrier names are an
+  error rather than a silent fallback.
+- `-divisor N` — override the dim weight divisor outright, taking
+  precedence over both `-unit` and `-carrier`. Set this if your actual
+  contract uses a different number, which does happen for
+  international or freight rates.
 - `-json` — parse input as a JSON array of objects instead of CSV.
   Applies to all sources for the run; you can't mix CSV and JSON files
   in one invocation.

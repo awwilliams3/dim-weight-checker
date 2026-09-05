@@ -153,6 +153,53 @@ func TestBillableWeightRoundsUp(t *testing.T) {
 	}
 }
 
+func TestDivisorForOverrideWinsOverCarrier(t *testing.T) {
+	d, err := divisorFor("usps", "in", 200)
+	if err != nil {
+		t.Fatalf("divisorFor: %v", err)
+	}
+	if d != 200 {
+		t.Errorf("d = %v, want 200 (explicit override)", d)
+	}
+}
+
+func TestDivisorForKnownCarrier(t *testing.T) {
+	d, err := divisorFor("usps", "in", 0)
+	if err != nil {
+		t.Fatalf("divisorFor: %v", err)
+	}
+	if d != 166 {
+		t.Errorf("d = %v, want 166", d)
+	}
+}
+
+func TestDivisorForCarrierIsCaseInsensitive(t *testing.T) {
+	d, err := divisorFor("UPS", "cm", 0)
+	if err != nil {
+		t.Fatalf("divisorFor: %v", err)
+	}
+	if d != metricDivisor {
+		t.Errorf("d = %v, want %v", d, metricDivisor)
+	}
+}
+
+func TestDivisorForUnknownCarrier(t *testing.T) {
+	_, err := divisorFor("dhl", "in", 0)
+	if err == nil {
+		t.Fatal("expected an error for an unknown carrier, got nil")
+	}
+}
+
+func TestDivisorForNoCarrierFallsBackToUnit(t *testing.T) {
+	d, err := divisorFor("", "cm", 0)
+	if err != nil {
+		t.Fatalf("divisorFor: %v", err)
+	}
+	if d != metricDivisor {
+		t.Errorf("d = %v, want %v", d, metricDivisor)
+	}
+}
+
 func TestBillableWeightMetricDivisor(t *testing.T) {
 	r := record{length: 50, width: 40, height: 30, actualWeight: 10}
 	dimWeight, _, billable, applies := billableWeight(r, metricDivisor)
