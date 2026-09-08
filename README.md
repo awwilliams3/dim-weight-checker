@@ -76,6 +76,21 @@ envelope,15,12,1,0.5,1,1,true
 - `-json` — parse input as a JSON array of objects instead of CSV.
   Applies to all sources for the run; you can't mix CSV and JSON files
   in one invocation.
+- `-summary` — instead of a row per package, print totals for the whole
+  batch (across all sources given): package count, how many hit
+  dimensional weight, and the summed actual, dimensional, and billable
+  weight.
+
+With `-summary`:
+
+```
+$ dim-weight-checker -summary packages.csv
+packages: 3
+dim weight applied: 2
+total actual weight: 10.5
+total dim weight: 65
+total billable weight: 65
+```
 
 ## Why the defaults are what they are
 

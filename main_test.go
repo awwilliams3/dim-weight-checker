@@ -200,6 +200,47 @@ func TestDivisorForNoCarrierFallsBackToUnit(t *testing.T) {
 	}
 }
 
+func TestSummarizeTotalsAcrossBatch(t *testing.T) {
+	recs := []record{
+		{id: "box-1", length: 10, width: 10, height: 10, actualWeight: 5},
+		{id: "box-2", length: 2, width: 2, height: 2, actualWeight: 15},
+	}
+	s := summarize(recs, imperialDivisor)
+	if s.packages != 2 {
+		t.Errorf("packages = %d, want 2", s.packages)
+	}
+	if s.dimApplies != 1 {
+		t.Errorf("dimApplies = %d, want 1", s.dimApplies)
+	}
+	if s.totalActualWeight != 20 {
+		t.Errorf("totalActualWeight = %v, want 20", s.totalActualWeight)
+	}
+	if s.totalDimWeight != 9 {
+		t.Errorf("totalDimWeight = %v, want 9", s.totalDimWeight)
+	}
+	if s.totalBillable != 23 {
+		t.Errorf("totalBillable = %v, want 23", s.totalBillable)
+	}
+}
+
+func TestSummarizeEmptyBatch(t *testing.T) {
+	s := summarize(nil, imperialDivisor)
+	if s.packages != 0 || s.dimApplies != 0 || s.totalActualWeight != 0 || s.totalDimWeight != 0 || s.totalBillable != 0 {
+		t.Errorf("got %+v, want zero value", s)
+	}
+}
+
+func TestPrintSummary(t *testing.T) {
+	var buf strings.Builder
+	printSummary(&buf, batchSummary{packages: 2, dimApplies: 1, totalActualWeight: 16, totalDimWeight: 58, totalBillable: 67})
+	got := buf.String()
+	for _, want := range []string{"packages: 2", "dim weight applied: 1", "total actual weight: 16", "total dim weight: 58", "total billable weight: 67"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output %q missing %q", got, want)
+		}
+	}
+}
+
 func TestBillableWeightMetricDivisor(t *testing.T) {
 	r := record{length: 50, width: 40, height: 30, actualWeight: 10}
 	dimWeight, _, billable, applies := billableWeight(r, metricDivisor)

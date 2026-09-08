@@ -51,8 +51,9 @@ func main() {
 	carrier := flag.String("carrier", "", "known carrier to use published divisors for: ups, fedex, usps (overrides the -unit default, overridden by -divisor)")
 	divisor := flag.Float64("divisor", 0, "dim weight divisor, overrides the default for the chosen unit and any -carrier")
 	jsonInput := flag.Bool("json", false, "parse input as a JSON array of objects instead of CSV")
+	summaryOnly := flag.Bool("summary", false, "print totals for the whole batch instead of a row per package")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: %s [-unit in|cm] [-carrier ups|fedex|usps] [-divisor N] [-json] [file ...]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "usage: %s [-unit in|cm] [-carrier ups|fedex|usps] [-divisor N] [-json] [-summary] [file ...]\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Reads shipping package rows (id,length,width,height,weight) as CSV,\n")
 		fmt.Fprintf(os.Stderr, "or as JSON objects with -json, and prints the billable weight a\n")
 		fmt.Fprintf(os.Stderr, "carrier would charge for each one.\n")
@@ -74,10 +75,7 @@ func main() {
 	}
 	defer sources.close()
 
-	w := csv.NewWriter(os.Stdout)
-	defer w.Flush()
-	w.Write([]string{"id", "length", "width", "height", "actual_weight", "dim_weight", "billable_weight", "dim_applies"})
-
+	var allRecs []record
 	exitCode := 0
 	for _, src := range sources.readers {
 		var recs []record
@@ -92,7 +90,16 @@ func main() {
 			exitCode = 1
 			continue
 		}
-		for _, r := range recs {
+		allRecs = append(allRecs, recs...)
+	}
+
+	if *summaryOnly {
+		printSummary(os.Stdout, summarize(allRecs, d))
+	} else {
+		w := csv.NewWriter(os.Stdout)
+		defer w.Flush()
+		w.Write([]string{"id", "length", "width", "height", "actual_weight", "dim_weight", "billable_weight", "dim_applies"})
+		for _, r := range allRecs {
 			dimWeight, actual, billable, applies := billableWeight(r, d)
 			w.Write([]string{
 				r.id,
@@ -147,6 +154,39 @@ func billableWeight(r record, divisor float64) (dimWeight, actual, billable floa
 		applies = true
 	}
 	return dimWeight, actual, billable, applies
+}
+
+// batchSummary totals billable weight across a batch, so a shipper can see
+// what a whole run of packages will cost without eyeballing every row.
+type batchSummary struct {
+	packages          int
+	dimApplies        int
+	totalActualWeight float64
+	totalDimWeight    float64
+	totalBillable     float64
+}
+
+func summarize(recs []record, divisor float64) batchSummary {
+	var s batchSummary
+	for _, r := range recs {
+		dimWeight, actual, billable, applies := billableWeight(r, divisor)
+		s.packages++
+		s.totalActualWeight += actual
+		s.totalDimWeight += dimWeight
+		s.totalBillable += billable
+		if applies {
+			s.dimApplies++
+		}
+	}
+	return s
+}
+
+func printSummary(w io.Writer, s batchSummary) {
+	fmt.Fprintf(w, "packages: %d\n", s.packages)
+	fmt.Fprintf(w, "dim weight applied: %d\n", s.dimApplies)
+	fmt.Fprintf(w, "total actual weight: %s\n", strconv.FormatFloat(s.totalActualWeight, 'f', -1, 64))
+	fmt.Fprintf(w, "total dim weight: %s\n", strconv.FormatFloat(s.totalDimWeight, 'f', -1, 64))
+	fmt.Fprintf(w, "total billable weight: %s\n", strconv.FormatFloat(s.totalBillable, 'f', -1, 64))
 }
 
 // sourceSet bundles the readers a run should consume, plus any files that
