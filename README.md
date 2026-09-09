@@ -8,6 +8,25 @@ divisor). A big, light box can cost as much to ship as a small, heavy one.
 This tool answers one question: for a batch of packages, what is the
 billable weight, and did dimensional weight kick in?
 
+## Install
+
+With Go installed:
+
+```
+go install github.com/awwilliams3/dim-weight-checker@latest
+```
+
+That puts the `dim-weight-checker` binary in `$GOPATH/bin` (or
+`$HOME/go/bin` if you haven't set one).
+
+Without Go, grab a prebuilt binary for your platform from the
+[Releases page](https://github.com/awwilliams3/dim-weight-checker/releases)
+and put it somewhere on your `$PATH`.
+
+To build those release binaries yourself, `make release VERSION=v1.0.0`
+cross-compiles for linux/darwin, amd64/arm64, and windows/amd64, and
+tars each one up under `dist/` along with a checksums file.
+
 ## Input format
 
 CSV rows of `id,length,width,height,weight`. A header row is fine, it's
